@@ -50,19 +50,6 @@ class AdminGotoTask extends PluginTask {
 
    public function onRun($tick) {
        foreach ($this->server->getOnlinePlayers() as $player) {
-           if($player->getInventory()->getChestplate()->getId() == 444) {
-               if($player->getInventory()->getChestplate()->getNamedTagEntry("isAdminPowered") !== null) {
-                   $itr = new BlockIterator($player->getLevel(), $player->getPosition(), $player->getDirectionVector(), $player->getEyeHeight(), 7);
-                   $itr->next();
-                   $itr->next();
-                   $itr->next();
-                   $itr->next();
-                   $itr->next();
-                   $itr->next();
-                   $player->setMotion($itr->current);
-               }
-                // $player->setMotion(new \pocketmine\math\Vector3($player->getMotion()->x, 0, $player->getMotion()->z));
-           }
 
 
            //Part needed for player's good working
@@ -75,6 +62,24 @@ class AdminGotoTask extends PluginTask {
             //    echo "{$player->getName()}:" . $player->getMotion()->y . "\n";
            }
        }
+    }
+
+
+
+    /*
+    Inverts a number
+    @param     $num    int
+    @return int
+    */
+    public function invert(int $num) : int {
+        if($num < 0) {
+            echo $num . " +> " . abs($num) . "\n";
+            return abs($num);
+        } else {
+            echo $num . " -> " . -$num . "\n";
+            return -$num;
+        }
+        return 0;
     }
 
 

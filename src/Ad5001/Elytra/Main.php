@@ -29,6 +29,9 @@ use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\StringTag;
 
 
+use pocketmine\utils\BlockIterator;
+
+
 use pocketmine\item\enchantment\Enchantment;
 
 
@@ -41,14 +44,17 @@ use Ad5001\Elytra\tasks\AdminGotoTask;
 
 class Main extends PluginBase implements Listener {
 
+    protected $ops;
+
     /*
     Called when the plugin enables
     */
     public function onEnable() {
         $this->getServer()->getPluginManager()->registerEvents($this,$this);
-        $this->getServer()->getScheduler()->scheduleRepeatingTask(new AdminGotoTask($this), 20);
+        $this->getServer()->getScheduler()->scheduleRepeatingTask(new AdminGotoTask($this), 10);
 		Item::$list[444] = Elytra::class;
         Item::addCreativeItem(new Elytra());
+        $this->ops = [];
     }
 
 
@@ -76,6 +82,36 @@ class Main extends PluginBase implements Listener {
 
 
     /*
+    When a player moves. To make it bounce with elytras.
+    @param     $event    \pocketmine\event\player\PlayerMoveEvent
+    */
+    public function onPlayerMove(\pocketmine\event\player\PlayerMoveEvent $event) {
+        $player = $event->getPlayer();
+           if($player->getInventory()->getChestplate()->getId() == 444) {
+               $flyingup = false;
+               for($i = 2; $i > 0; $i--) {
+                   if($player->getLevel()->getBlock(new \pocketmine\math\Vector3 (round($player->x), round($player->y) - $i, round($player->z)))->getId() !== 0) {
+                       $flyingup = true;
+                   }
+               }
+               if(isset($this->getAdminsModePlayers()[$player->getName()]) && $flyingup) {
+                   $player->setMotion(new \pocketmine\math\Vector3($player->getMotion()->x, 3, $player->getMotion()->z));
+               }
+               $flyingup = false;
+               for($i = 4; $i > 0; $i--) {
+                   $id = $player->getLevel()->getBlock(new \pocketmine\math\Vector3 (round($player->x), round($player->y) - $i, round($player->z)))->getId();
+                   if($id == 165 || $id == 88) {
+                       $flyingup = true;
+                   }
+               }
+               if($flyingup) {
+                   $player->setMotion(new \pocketmine\math\Vector3($player->getMotion()->x, 3, $player->getMotion()->z));
+               }
+           }
+    }
+
+
+    /*
     Called when one of the defined commands of the plugin has been called
     @param     $sender     \pocketmine\command\CommandSender
     @param     $cmd          \pocketmine\command\Command
@@ -87,30 +123,41 @@ class Main extends PluginBase implements Listener {
          switch($cmd->getName()) {
             case "opelytra":
             if($sender instanceof Player) {
-                $item = new Elytra();
-                $nbt = new CompoundTag("", [
-                    "isAdminPowered" => new StringTag("isAdminPowered", 1)
-                ]);
-                $item->setCompoundTag($nbt);
-                $item->addEnchantment(Enchantment::getEnchantement(0)->setLevel(0));
-                $sender->getInventory()->addItem($item);
-                $sender->sendMessage("§aYou got your brand new elytra !");
+                if(isset($this->ops[$sender->getName()])) {
+                    unset($this->ops[$sender->getName()]);
+                    $sender->sendMessage("§aYou are back to te original elytra !");
+                } else {
+                    $this->ops[$sender->getName()] = true;
+                    $sender->sendMessage("§aYou are now in the admin elytra mode ! Go try out your powers !");
+                }
             }
             break;
             case "boost":
             if($sender instanceof Player && $sender->getInventory()->getChestplate()->getId() == 444) {
-                $itr = new BlockIterator($sender->getLevel(), $sender->getPosition(), $sender->getDirectionVector(), $sender->getEyeHeight(), 7);
+                $itr = new BlockIterator($sender->getLevel(), $sender->getPosition(), $sender->getDirectionVector(), $sender->getEyeHeight(), 4);
                 $itr->next();
                 $itr->next();
                 $itr->next();
-                $itr->next();
-                $itr->next();
-                $itr->next();
-                $sender->setMotion($itr->current());
+                $x = sqrt((new \pocketmine\math\Vector3($sender->x, 0, 0))->distanceSquared(new \pocketmine\math\Vector3($itr->current()->x, 0, 0)));
+                $y = sqrt((new \pocketmine\math\Vector3($sender->y, 0, 0))->distanceSquared(new \pocketmine\math\Vector3($itr->current()->y, 0, 0)));
+                $z = sqrt((new \pocketmine\math\Vector3($sender->z, 0, 0))->distanceSquared(new \pocketmine\math\Vector3($itr->current()->z, 0, 0)));
+                // $x -= $x * 2;
+                // $y -= $y * 2;
+                // $z -= $z * 2; // Inverting the number to go in the right direction.
+                $sender->setMotion(new \pocketmine\math\Vector3($x, $y, $z));
             }
             break;
          }
          return false;
+    }
+
+
+    /*
+    Returns players in ADMIN mode
+    @return array
+    */
+    public function getAdminsModePlayers() : array {
+        return $this->ops;
     }
 
 }
