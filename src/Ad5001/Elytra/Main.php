@@ -100,7 +100,7 @@ class Main extends PluginBase implements Listener {
                $flyingup = false;
                for($i = 4; $i > 0; $i--) {
                    $id = $player->getLevel()->getBlock(new \pocketmine\math\Vector3 (round($player->x), round($player->y) - $i, round($player->z)))->getId();
-                   if($id == 165 || $id == 88) {
+                   if(in_array($id, $this->getConfig()->get("bouncable_blocks"))) {
                        $flyingup = true;
                    }
                }
@@ -134,17 +134,8 @@ class Main extends PluginBase implements Listener {
             break;
             case "boost":
             if($sender instanceof Player && $sender->getInventory()->getChestplate()->getId() == 444) {
-                $itr = new BlockIterator($sender->getLevel(), $sender->getPosition(), $sender->getDirectionVector(), $sender->getEyeHeight(), 4);
-                $itr->next();
-                $itr->next();
-                $itr->next();
-                $x = sqrt((new \pocketmine\math\Vector3($sender->x, 0, 0))->distanceSquared(new \pocketmine\math\Vector3($itr->current()->x, 0, 0)));
-                $y = sqrt((new \pocketmine\math\Vector3($sender->y, 0, 0))->distanceSquared(new \pocketmine\math\Vector3($itr->current()->y, 0, 0)));
-                $z = sqrt((new \pocketmine\math\Vector3($sender->z, 0, 0))->distanceSquared(new \pocketmine\math\Vector3($itr->current()->z, 0, 0)));
-                // $x -= $x * 2;
-                // $y -= $y * 2;
-                // $z -= $z * 2; // Inverting the number to go in the right direction.
-                $sender->setMotion(new \pocketmine\math\Vector3($x, $y, $z));
+                if(!isset($args[0])) $args[0] = 2;
+                $sender->setMotion(new \pocketmine\math\Vector3($sender->getMotion()->x, $args[0], $sender->getMotion()->z));
             }
             break;
          }
