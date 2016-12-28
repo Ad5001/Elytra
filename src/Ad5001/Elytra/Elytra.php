@@ -1,8 +1,8 @@
 <?php
-//From Elywing.
 
 namespace Ad5001\Elytra;
 
+use pocketmine\item\Armor;
 
 class Elytra extends Armor{
 	
