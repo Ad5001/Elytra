@@ -1,5 +1,4 @@
-# Welcome to Elytras 2.x.x config !
-
+# Welcome to Elytra 2.x.x config !
 # Here configure which block are considered "bouncable", enter their ids. 
-# Try going on those blocks by usini the elytra and the see the magic.
+# Try going on those blocks by using the elytra and the see the magic.
 bouncable_blocks: [165, 88]
