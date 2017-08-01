@@ -1,154 +1,128 @@
 <?php
-
-
 namespace Ad5001\Elytra;
 
-
-use pocketmine\command\CommandSender;
-
-
 use pocketmine\command\Command;
-
-
+use pocketmine\command\CommandSender;
+use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\Listener;
-
-
-use pocketmine\plugin\PluginBase;
-
-
-use pocketmine\Server;
-
-
-use pocketmine\Player;
-
-
+use pocketmine\event\player\PlayerKickEvent;
+use pocketmine\event\player\PlayerMoveEvent;
+use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\item\Item;
-
-
-use pocketmine\nbt\tag\CompoundTag;
-use pocketmine\nbt\tag\StringTag;
-
-
-use pocketmine\utils\BlockIterator;
-
-
-use pocketmine\item\enchantment\Enchantment;
-
+use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\protocol\PlayerActionPacket;
+use pocketmine\plugin\PluginBase;
+use pocketmine\Player;
+use pocketmine\utils\TextFormat;
 
 use Ad5001\Elytra\tasks\AdminGotoTask;
 
-
-
-
-
-
 class Main extends PluginBase implements Listener {
 
-    protected $ops;
+	protected $ops = [];
 
-    /*
-    Called when the plugin enables
-    */
-    public function onEnable() {
-        $this->getServer()->getPluginManager()->registerEvents($this,$this);
-        $this->getServer()->getScheduler()->scheduleRepeatingTask(new AdminGotoTask($this), 10);
+	public function onEnable() {
+		$this->saveDefaultConfig();
+		$this->getServer()->getPluginManager()->registerEvents($this, $this);
+		$this->getServer()->getScheduler()->scheduleRepeatingTask(new AdminGotoTask($this), 10);
 		Item::$list[444] = Elytra::class;
-        Item::addCreativeItem(new Elytra());
-        $this->ops = [];
-    }
+		Item::addCreativeItem(new Elytra());
+	}
 
+	/**
+	 * @priority LOW
+	 *
+	 * @param EntityDamageEvent $event
+	 */
+	public function onEntityDamage(EntityDamageEvent $event) {
+		$damaged = $event->getEntity();
+		if($damaged instanceof Player) {
+			if($event->getCause() == 4 and $damaged->getInventory()->getChestplate()->getId() == 444) {
+				$event->setCancelled();
+			}
+		}
+	}
 
-    /*
-    Prevent when someone is falling
-    @param     $event    \pocketmine\event\entity\EntityDamageEvent
-    @return null
-    */
-    public function onEntityDamage(\pocketmine\event\entity\EntityDamageEvent $event) {
-        if($event->getCause() == 4 && $event->getEntity()->getInventory()->getChestplate()->getId() == 444) {
-            $event->setCancelled();
-        }
-    }
+	/**
+	 * @priority LOW
+	 *
+	 * @param PlayerKickEvent $event
+	 */
+	public function onPlayerKick(PlayerKickEvent $event) {
+		if(strpos(strtolower($event->getReason()), "flying") !== false and $event->getPlayer()->getInventory()->getChestplate()->getId() == 444) {
+			$event->setCancelled();
+		}
+	}
 
+	/**
+	 * @priority LOW
+	 *
+	 * @param PlayerMoveEvent $event
+	 */
+	public function onPlayerMove(PlayerMoveEvent $event) {
+		$player = $event->getPlayer();
+		if($player->getInventory()->getChestplate()->getId() == 444) {
+			$flyingUp = false;
+			// TODO: change Bounding Box of player depending on their angle of flight
+			for($i = 2; $i > 0; $i--) {
+				if($player->getLevel()->getBlock(new Vector3(round($player->x), round($player->y) - $i, round($player->z)))->getId() !== 0) {
+					$flyingUp = true;
+				}
+			}
+			if(isset($this->ops[$player->getName()]) and $flyingUp) {
+				$player->setMotion(new Vector3($player->getMotion()->x, 3, $player->getMotion()->z));
+			}
+			$flyingUp = false;
+			for($i = 4; $i > 0; $i--) {
+				$id = $player->getLevel()->getBlock(new Vector3 (round($player->x), round($player->y) - $i, round($player->z)))->getId();
+				if(in_array($id, $this->getConfig()->get("bouncable_blocks",[]))) {
+					$flyingUp = true;
+				}
+			}
+			if($flyingUp) {
+				$player->setMotion(new Vector3($player->getMotion()->x, 3, $player->getMotion()->z));
+			}
+		}
+	}
 
-    /*
-    Prevents the player from being kicked of flyign by using the elytras.
-    @param     $event    \pocketmine\event\player\PlayerKickEvent
-    */
-    public function onPlayerKick(\pocketmine\event\player\PlayerKickEvent $event) {
-        if(strpos($event->getReason(), "Flying is not enabled on this server") !== false && $event->getPlayer()->getInventory()->getChestplate()->getId() == 444) {
-            $event->setCancelled();
-        }
-    }
+	public function onDataPacket(DataPacketReceiveEvent $ev) {
+		$packet = $ev->getPacket();
+		if($packet instanceof PlayerActionPacket) {
+			if($packet->action === PlayerActionPacket::ACTION_START_GLIDE) {
+				$ev->getPlayer()->setDataFlag(Player::DATA_FLAGS, Player::DATA_FLAG_GLIDING, true, Player::DATA_TYPE_BYTE);
+			}elseif($packet->action === PlayerActionPacket::ACTION_STOP_GLIDE) {
+				$ev->getPlayer()->setDataFlag(Player::DATA_FLAGS, Player::DATA_FLAG_GLIDING, false, Player::DATA_TYPE_BYTE);
+			}
+		}
+	}
 
-
-    /*
-    When a player moves. To make it bounce with elytras.
-    @param     $event    \pocketmine\event\player\PlayerMoveEvent
-    */
-    public function onPlayerMove(\pocketmine\event\player\PlayerMoveEvent $event) {
-        $player = $event->getPlayer();
-           if($player->getInventory()->getChestplate()->getId() == 444) {
-               $flyingup = false;
-               for($i = 2; $i > 0; $i--) {
-                   if($player->getLevel()->getBlock(new \pocketmine\math\Vector3 (round($player->x), round($player->y) - $i, round($player->z)))->getId() !== 0) {
-                       $flyingup = true;
-                   }
-               }
-               if(isset($this->getAdminsModePlayers()[$player->getName()]) && $flyingup) {
-                   $player->setMotion(new \pocketmine\math\Vector3($player->getMotion()->x, 3, $player->getMotion()->z));
-               }
-               $flyingup = false;
-               for($i = 4; $i > 0; $i--) {
-                   $id = $player->getLevel()->getBlock(new \pocketmine\math\Vector3 (round($player->x), round($player->y) - $i, round($player->z)))->getId();
-                   if(in_array($id, $this->getConfig()->get("bouncable_blocks"))) {
-                       $flyingup = true;
-                   }
-               }
-               if($flyingup) {
-                   $player->setMotion(new \pocketmine\math\Vector3($player->getMotion()->x, 3, $player->getMotion()->z));
-               }
-           }
-    }
-
-
-    /*
-    Called when one of the defined commands of the plugin has been called
-    @param     $sender     \pocketmine\command\CommandSender
-    @param     $cmd          \pocketmine\command\Command
-    @param     $label         mixed
-    @param     $args          array
-    return bool
-    */
-    public function onCommand(\pocketmine\command\CommandSender $sender, \pocketmine\command\Command $cmd,$label, array $args): bool {
-         switch($cmd->getName()) {
-            case "opelytra":
-            if($sender instanceof Player) {
-                if(isset($this->ops[$sender->getName()])) {
-                    unset($this->ops[$sender->getName()]);
-                    $sender->sendMessage("§aYou are back to te original elytra !");
-                } else {
-                    $this->ops[$sender->getName()] = true;
-                    $sender->sendMessage("§aYou are now in the admin elytra mode ! Go try out your powers !");
-                }
-            }
-            break;
-            case "boost":
-            if($sender instanceof Player && $sender->getInventory()->getChestplate()->getId() == 444) {
-                if(!isset($args[0])) $args[0] = 2;
-                $sender->setMotion(new \pocketmine\math\Vector3($sender->getMotion()->x, $args[0], $sender->getMotion()->z));
-            }
-            break;
-         }
-         return false;
-    }
-
-
-    /*
-    Returns players in ADMIN mode
-    @return array
-    */
-    public function getAdminsModePlayers() : array {
-        return $this->ops;
-    }
-
+	/**
+	 * @param CommandSender $sender
+	 * @param Command $cmd
+	 * @param string $label
+	 * @param array $args
+	 * @return bool
+	 */
+	public function onCommand(CommandSender $sender, Command $cmd, string $label, array $args) : bool {
+		switch($cmd->getName()) {
+			case "opelytra":
+				if($sender instanceof Player) {
+					if(isset($this->ops[$sender->getName()])) {
+						unset($this->ops[$sender->getName()]);
+						$sender->sendMessage(TextFormat::GREEN."You are back to the original elytra!");
+					} else {
+						$this->ops[$sender->getName()] = true;
+						$sender->sendMessage(TextFormat::GREEN."You are now in the admin elytra mode! Go try out your powers!");
+					}
+				}
+				break;
+			case "boost":
+				if($sender instanceof Player and $sender->getInventory()->getChestplate()->getId() == 444) {
+					if(!isset($args[0])) $args[0] = 2;
+					$sender->setMotion(new Vector3($sender->getMotion()->x, $args[0], $sender->getMotion()->z));
+				}
+				break;
+		}
+		return false;
+	}
 }
