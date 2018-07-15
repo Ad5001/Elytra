@@ -1,3 +1,4 @@
+## This repository was moved to [git.ad5001.eu](https://git.ad5001.eu/Ad5001/Elytra)
 # Elytras 2.0
 Elytras are back on your MCPE 1.0 servers with insane additions !       
 Play with your elytras without limitations as if you were on a normal minecraft world !     
